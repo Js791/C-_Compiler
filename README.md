@@ -1,4 +1,4 @@
-# C++_Compiler
+# C++ Small Compiler
 
 A Small Compiler created in C++
 
