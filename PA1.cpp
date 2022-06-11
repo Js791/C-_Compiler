@@ -2,6 +2,8 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <cstring>
+#include <fstream>
 
 using namespace std;
 
@@ -12,7 +14,7 @@ LexItem getNextToken (istream& in, int& linenumber)
     string cur_lex = "";
     char cur_char;
     lex_state state = START_state;
-    while(true)
+    while(!in.eof() && in.peek() != std::ifstream::traits_type::eof())
     {
         switch (state)
         {
@@ -91,9 +93,21 @@ LexItem getNextToken (istream& in, int& linenumber)
             }
             else if (cur_char == '>')
             {
-                return LexItem(GTHAN,"/",linenumber);
+                return LexItem(GTHAN,">",linenumber);
             }
-            
+            else if (cur_char == '\n')
+            {
+                linenumber++;
+            }
+            else if (isspace(cur_char))
+            {
+                //space
+            }
+            else
+            {
+                
+                return LexItem(ERR,cur_lex+cur_char,linenumber);
+            }
             break;
 
             case IDENT_state:
@@ -127,65 +141,7 @@ LexItem getNextToken (istream& in, int& linenumber)
             
             else
             {
-                if(cur_lex == "program")
-                {
-                    return LexItem(PROGRAM,cur_lex,linenumber);
-                }
-                else if (cur_lex == "begin")
-                {
-                    return LexItem(BEGIN,cur_lex,linenumber);
-                }
-                else if (cur_lex == "end")
-                {
-                    return LexItem(END,cur_lex,linenumber);
-                }
-                else if (cur_lex == "writeLn")
-                {
-                    return LexItem(WRITELN,cur_lex,linenumber);
-                }
-                else if (cur_lex == "if")
-                {
-                    return LexItem(IF,cur_lex,linenumber);
-                }
-                else if (cur_lex == "else")
-                {
-                    return LexItem(ELSE,cur_lex,linenumber);
-                }
-                else if (cur_lex == "integer")
-                {
-                    return LexItem(INTEGER,cur_lex,linenumber);
-                }
-                
-                else if (cur_lex == "real")
-                {
-                    return LexItem(REAL,cur_lex,linenumber);
-                }
-                else if (cur_lex == "string")
-                {
-                    return LexItem(STRING,cur_lex,linenumber);
-                }
-                else if (cur_lex == "for")
-                {
-                    return LexItem(FOR,cur_lex,linenumber);
-                }
-                else if (cur_lex == "to")
-                {
-                    return LexItem(TO,cur_lex,linenumber);
-                }
-                else if (cur_lex == "downto")
-                {
-                    return LexItem(DOWNTO,cur_lex,linenumber);
-                }
-                else if (cur_lex == "var")
-                {
-                    return LexItem(VAR,cur_lex,linenumber);
-                }
-
-                else
-                {
-                   return LexItem(IDENT,cur_lex,linenumber);
-                }
-                
+               return id_or_kw(cur_lex,linenumber);
             }
             break;
 
@@ -231,7 +187,13 @@ LexItem getNextToken (istream& in, int& linenumber)
                 in >> cur_char;
                 cur_lex+=cur_char;
             }
-             else
+            else if(cur_char == '.')
+            {
+                cur_lex += cur_char;
+                return LexItem(ERR,cur_lex,linenumber);
+            }    
+              
+            else
             {
                 return LexItem(RCONST,cur_lex,linenumber);
             }
@@ -241,6 +203,7 @@ LexItem getNextToken (istream& in, int& linenumber)
             do
             {
                 in >> cur_char;
+                if(cur_char == '\n') return LexItem(ERR,cur_lex,linenumber);
                 cur_lex+=cur_char;
             }
             while(cur_char != '\'');
@@ -258,7 +221,7 @@ LexItem getNextToken (istream& in, int& linenumber)
 
             else
             {
-                return LexItem(DOT,cur_lex,linenumber);
+                return LexItem(ERR,cur_lex,linenumber);
             }
             break;
 
@@ -278,15 +241,17 @@ LexItem getNextToken (istream& in, int& linenumber)
 
             case COM_state:
             {
-                char prev = ';';
+                char prev;
                 do
                 {
                 prev = cur_char;
                 in >> cur_char;
+                if(cur_char == '\n') linenumber++;
                 cur_lex+=cur_char;
                 }
-                while(cur_char != ')' && cur_char != '*');
-
+                while(cur_char != ')' && prev != '*' && !in.eof() && in.peek() != std::ifstream::traits_type::eof());
+                
+                if(in.eof() || in.peek() == std::ifstream::traits_type::eof()) return LexItem(ERR,cur_lex,linenumber);
                 cur_lex = "";
                 state = START_state;
             }
@@ -298,6 +263,7 @@ LexItem getNextToken (istream& in, int& linenumber)
             if(cur_char == '*')
             {
                 in >> cur_char;
+                cur_lex+=cur_char;
                 cur_char = ' ';
                 state = COM_state;
             }
@@ -306,17 +272,185 @@ LexItem getNextToken (istream& in, int& linenumber)
                 return LexItem(LPAREN,cur_lex,linenumber);
             }
             break;
-
-
-
-
-
-
-
-            
-
-
         }
 
     }
+    return LexItem(DONE,"",linenumber);
+    
+}
+LexItem id_or_kw(const string& lexeme, int linenumber)
+{   
+                const string &cur_lex = lexeme;
+                if(strcasecmp(cur_lex.c_str(),"PROGRAM")==0)
+                {
+                    return LexItem(PROGRAM,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"begin")==0)
+                {
+                    return LexItem(BEGIN,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"END")==0)
+                {
+                    return LexItem(END,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"WRITELN")==0)
+                {
+                    return LexItem(WRITELN,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"IF")==0)
+                {
+                    return LexItem(IF,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"ELSE")==0)
+                {
+                    return LexItem(ELSE,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"integer")==0)
+                {
+                    return LexItem(INTEGER,cur_lex,linenumber);
+                }
+                
+                else if (strcasecmp(cur_lex.c_str(),"real")==0)
+                {
+                    return LexItem(REAL,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"string")==0)
+                {
+                    return LexItem(STRING,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"for")==0)
+                {
+                    return LexItem(FOR,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"to")==0)
+                {
+                    return LexItem(TO,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"DOWNTO")==0)
+                {
+                    return LexItem(DOWNTO,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"VAR")==0)
+                {
+                    return LexItem(VAR,cur_lex,linenumber);
+                }
+                else if (strcasecmp(cur_lex.c_str(),"do")==0)
+                {
+                    return LexItem(DO,cur_lex,linenumber);
+                }
+                else
+                {
+                   return LexItem(IDENT,cur_lex,linenumber);
+                }
+}
+
+ostream& operator<<(ostream& out, const LexItem& tok)
+{
+    string lex = tok.GetLexeme();
+    for(int i =0;i<lex.size();i++)
+    {
+        lex[i] = toupper(lex[i]);
+    }
+    
+    switch(tok.GetToken())
+    {
+        case IDENT:
+        out << "IDENT" << "(" << lex << ")";
+        break;
+        case ICONST:
+        out << "ICONST" << "(" << lex << ")";
+        break;
+        case RCONST:
+        out << "RCONST" << "(" << lex << ")";
+        break;
+        case SCONST:
+        out << "SCONST" << "(" << tok.GetLexeme().substr(1,lex.size()-2) << ")";
+        break;
+        case SEMICOL:
+        out << "SEMICOL";
+        break;
+        case EQUAL:
+        out << "EQUAL";
+        break;
+        case PLUS:
+        out << "PLUS";
+        break;
+        case MINUS:
+        out << "MINUS";
+        break;
+        case MULT:
+        out << "MULT";
+        break;
+        case DIV:
+        out << "DIV";
+        break;
+        case ASSOP:
+        out << "ASSOP";
+        break;
+        case LPAREN:
+        out << "LPAREN";
+        break;
+        case RPAREN:
+        out << "RPAREN";
+        break;
+        case GTHAN:
+        out << "GTHAN";
+        break;
+        case LTHAN:
+        out << "LTHAN";
+        break;
+        case COLON:
+        out << "COLON";
+        break;
+        case COMMA:
+        out << "COMMA";
+        break;
+        case PROGRAM:
+        out << "PROGRAM";
+        break;
+        case END:
+        out << "END";
+        break;
+        case BEGIN:
+        out << "BEGIN";
+        break;
+        case WRITELN:
+        out << "WRITELN";
+        break;
+        case IF:
+        out << "IF";
+        break;
+        case ELSE:
+        out << "ELSE";
+        break;
+        case INTEGER:
+        out << "INTEGER";
+        break;
+        case REAL:
+        out << "REAL";
+        break;
+        case STRING:
+        out << "STRING";
+        break;
+        case FOR:
+        out << "FOR";
+        break;
+        case TO:
+        out << "TO";
+        break;
+        case DOWNTO:
+        out << "DOWNTO";
+        break;
+        case VAR:
+        out << "VAR";
+        break;
+        case DO:
+        out << "DO";
+        break;
+        default:
+         out << lex;
+        break;
+    }
+
+    return out;
 }
